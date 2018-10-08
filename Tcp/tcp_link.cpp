@@ -6,10 +6,10 @@
  //!
 //! \brief This class defines a thread such that a QObject can run in peace.
 //!
-class ReceiverThread : public QThread
+class ClientThread : public QThread
 {
 public:
-    ReceiverThread(const std::function<void(void)> &func):
+    ClientThread(const std::function<void(void)> &func):
         m_func(func),
         m_Shutdown(false)
     {
@@ -115,11 +115,7 @@ void TcpLink::RequestReset()
     m_reqReset = true;
     m_stoppMutex.unlock();
 }
-uint64_t TcpLink::getConnectionSpeed() const
-{
-    // TODO: Figure out a way to have a serial ilink and udp ilink separated, as udp doesnt need connectionspeed
-    return 0;
-}
+
 
 bool TcpLink::Connect(void)
 {
@@ -130,13 +126,14 @@ bool TcpLink::Connect(void)
 
     // Initialize the connection
     if (!_hardwareConnect(error, errorString)) {
-        if (_config.isAutoConnect()) {
+        /*if (_config.isAutoConnect()) {
             // Be careful with spitting out open error related to trying to open a busy port using autoconnect
             if (error == QTcpSocket::AddressInUseError) {
                 // Device already open, ignore and fail connect
                 return false;
             }
-        }
+
+        }*/
 
         _emitLinkError("Error connecting: Could not create port. " + errorString.toStdString());
         return false;
@@ -148,7 +145,7 @@ void TcpLink::Disconnect(void)
 {
     if (tcpClient) {
 
-        ((ReceiverThread*)m_ListenThread)->shutdown();
+        ((ClientThread*)m_ListenThread)->shutdown();
         delete m_ListenThread;
 
         tcpClient->close();
@@ -194,7 +191,7 @@ bool TcpLink::_hardwareConnect(QAbstractSocket::SocketError &error, QString& err
         //std::cerr << "open failed" << m_port->errorString().toStdString() << m_port->error() << getName() << _config.isAutoConnect() << std::endl;
         error = tcpClient->error();
         errorString = tcpClient->errorString();
-        EmitEvent([&](const ILinkEvents *ptr){ptr->CommunicationUpdate(this, _config.getServerAddress(), "Error opening port: " + errorString.toStdString());});
+        EmitEvent([&](ILinkEvents *ptr){ptr->CommunicationUpdate(this, _config.getServerAddress(), "Error opening port: " + errorString.toStdString());});
         tcpClient->close();
         delete tcpClient;
         tcpClient = NULL;
@@ -203,13 +200,13 @@ bool TcpLink::_hardwareConnect(QAbstractSocket::SocketError &error, QString& err
 
 
     // TODO: Figure out the alternative to this:
-    EmitEvent([this](const ILinkEvents *ptr){ptr->CommunicationUpdate(this, getListenAddress(), "Opened port!");});
-    EmitEvent([this](const ILinkEvents *ptr){ptr->Connected(this);});
+    EmitEvent([this](ILinkEvents *ptr){ptr->CommunicationUpdate(this, getClientAddress(), "Opened port!");});
+    EmitEvent([this](ILinkEvents *ptr){ptr->Connected(this);});
 
     std::cout << "Connection TCPLink: " << "with settings " << _config.getServerAddress() << ":" << _config.getServerPortNumber() << std::endl;
 
 
-    m_ListenThread = new ReceiverThread([&](){
+    m_ListenThread = new ClientThread([&](){
         if(tcpClient->waitForReadyRead(300))
             this->processData();
 
@@ -219,23 +216,24 @@ bool TcpLink::_hardwareConnect(QAbstractSocket::SocketError &error, QString& err
         }
 
 /*
-        m_TcpServer = std::make_shared<QTcpServer>();
+        tcpServer = std::make_shared<QTcpServer>();
         m_ListenThread = new ServerThread([&](){
-            if(m_TcpServer->hasPendingConnections())
+            if(tcpServer->hasPendingConnections())
                 this->on_newConnection();
         });
 
         // For some reason, listening on any other specific address (i.e. not Any) fails.
         //      - As a workaround, I check the incoming connection below for equality with the guiHostAddress before parsing
-        m_TcpServer->listen(QHostAddress::Any, m_listenPort);
-    //    m_TcpServer->listen(m_guiHostAddress, m_listenPort);
+        tcpServer->listen(QHostAddress::Any, m_listenPort);
+    //    tcpServer->listen(m_guiHostAddress, m_listenPort);
     */
     });
-    m_TcpServer->moveToThread(m_ListenThread);
+
+    tcpServer.moveToThread(m_ListenThread);
     m_ListenThread->start();
 
 
-    if(!m_TcpServer->isListening())
+    if(!tcpServer.isListening())
     {
         std::cout << "Server could not start..." << std::endl;
     }
@@ -244,11 +242,11 @@ bool TcpLink::_hardwareConnect(QAbstractSocket::SocketError &error, QString& err
         std::cout << "GUI TCP Server started" << std::endl;
     }
 
-    return m_TcpServer->isListening();
+    return tcpServer.isListening();
 }
 
 
-void TcpLink::WriteBytes(const char *bytes, int length) const
+void TcpLink::WriteBytes(const char *bytes, int length)
 {
     QByteArray data(bytes, length);
     if(tcpClient && tcpClient->isOpen()) {
@@ -257,7 +255,7 @@ void TcpLink::WriteBytes(const char *bytes, int length) const
     //TODO: ETW: use correct write for TCP    tcpClient->writeDatagram(data, QHostAddress(QString::fromStdString(_config.senderAddress())), _config.senderPortNumber());
     } else {
         // Error occured
-        _emitLinkError("Could not send data - link " + getSenderAddress() + ":" + std::to_string(getSenderPortNumber()) + " is disconnected!");
+        _emitLinkError("Could not send data - link " + getClientAddress() + ":" + std::to_string(getClientPortNumber()) + " is disconnected!");
     }
 }
 
@@ -279,38 +277,12 @@ bool TcpLink::isConnected() const
 }
 
 
-void TcpLink::_emitLinkError(const std::string& errorMsg) const
+void TcpLink::_emitLinkError(const std::string& errorMsg)
 {
-    std::string msg = "Error on link " + getListenAddress() + ":" + std::to_string(getListenPortNumber()) + " - " + errorMsg;
-    EmitEvent([&](const ILinkEvents *ptr){ptr->CommunicationError(this, "Link Error", msg);});
+    std::string msg = "Error on link " + getServerAddress() + ":" + std::to_string(getServerPortNumber()) + " - " + errorMsg;
+    EmitEvent([&](ILinkEvents *ptr){ptr->CommunicationError(this, "Link Error", msg);});
 }
 
-LinkConfiguration TcpLink::getLinkConfiguration()
-{
-    return _config;
-}
-
-std::string TcpLink::getListenAddress() const
-{
-    return _config.getServerAddress();
-}
-
-int TcpLink::getListenPortNumber() const
-{
-    return _config.getServerPortNumber();
-}
-
-std::string TcpLink::getSenderAddress() const
-{
-    // TODO-PAT: Handle when senderAddress has not been set, as this is an optional parameter
-    return _config.senderAddress();
-}
-
-int TcpLink::getSenderPortNumber() const
-{
-    // TODO-PAT: Handle when senderPortNumber has not been set, as this is an optional parameter
-    return _config.senderPortNumber();
-}
 
 void TcpLink::processData(void)
 {
@@ -318,7 +290,7 @@ void TcpLink::processData(void)
         QByteArray dataBuff(tcpClient->readAll());
 
         std::vector<uint8_t> vec_buffer = std::vector<uint8_t>(dataBuff.begin(), dataBuff.end());
-        EmitEvent([this,&vec_buffer](const ILinkEvents *ptr){ptr->ReceiveData(this, vec_buffer);});
+        EmitEvent([this,&vec_buffer](ILinkEvents *ptr){ptr->ReceiveData(this, vec_buffer);});
   //  }
 
 }
@@ -327,7 +299,7 @@ void TcpLink::linkError(QTcpSocket::SocketError error)
 {
     switch (error) {
     case QTcpSocket::AddressInUseError:
-        EmitEvent([this](const ILinkEvents *ptr){ptr->ConnectionRemoved(this);});
+        EmitEvent([this](ILinkEvents *ptr){ptr->ConnectionRemoved(this);});
         break;
     default:
         break;
@@ -335,4 +307,4 @@ void TcpLink::linkError(QTcpSocket::SocketError error)
 }
 
 
-}
+

@@ -18,39 +18,39 @@ TcpConfiguration::~TcpConfiguration()
 
 TcpConfiguration::TcpConfiguration(const std::string& listenAddress, const int &listenPort, const std::string& senderAddress, const int &senderPort)
 {
-    _listenAddress       = listenAddress;
-    _listenPortNumber    = listenPort;
-    _senderAddress       = senderAddress;
-    _senderPortNumber    = senderPort;
+    serverAddress       = listenAddress;
+    serverPortNumber    = listenPort;
+    clientAddress       = senderAddress;
+    clientPortNumber    = senderPort;
 }
 
 TcpConfiguration::TcpConfiguration(TcpConfiguration* copy)
 {
-    _listenAddress       = copy->listenAddress();
-    _listenPortNumber    = copy->listenPortNumber();
-    _senderAddress       = copy->senderAddress();
-    _senderPortNumber    = copy->senderPortNumber();
+    serverAddress        = copy->getServerAddress();
+    serverPortNumber     = copy->getServerPortNumber();
+    clientAddress        = copy->getClientAddress();
+    clientPortNumber     = copy->getClientPortNumber();
 }
 
 
-void TcpConfiguration::setListenAddress(std::string address)
+void TcpConfiguration::setServerAddress(std::string address)
 {
-    _listenAddress = address;
+    serverAddress = address;
 }
 
-void TcpConfiguration::setListenPortNumber(int portNumber)
+void TcpConfiguration::setServerPortNumber(int portNumber)
 {
-    _listenPortNumber = portNumber;
+    serverPortNumber = portNumber;
 }
 
-void TcpConfiguration::setSenderAddress(std::string address)
+void TcpConfiguration::setClientAddress(std::string address)
 {
-    _senderAddress = address;
+    clientAddress = address;
 }
 
-void TcpConfiguration::setSenderPortNumber(int portNumber)
+void TcpConfiguration::setClientPortNumber(int portNumber)
 {
-    _senderPortNumber = portNumber;
+    clientPortNumber = portNumber;
 }
 
 

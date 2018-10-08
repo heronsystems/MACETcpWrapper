@@ -46,7 +46,6 @@ public:
     }
 
     virtual void RequestReset();
-
     virtual void WriteBytes(const char *bytes, int length);
 
     //!
@@ -107,8 +106,6 @@ private:
     bool _hardwareConnect(QTcpSocket::SocketError& error, QString& errorString);
 
 
-    bool _isBootloader();
-
 private:
 
 
@@ -119,6 +116,9 @@ private:
 private:
 
     void PortEventLoop();
+
+    void processData();
+
 
 
 private:
@@ -136,7 +136,7 @@ private:
     volatile bool        m_stopp;
     volatile bool        m_reqReset;
     std::mutex           m_stoppMutex;      // Mutex for accessing _stopp
-    TcpConfiguration _config;
+    TcpConfiguration     _config;
 };
 
 #endif // TCPLINK_H
