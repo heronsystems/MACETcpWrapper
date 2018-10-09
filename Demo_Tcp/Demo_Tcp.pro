@@ -1,3 +1,4 @@
+TEMPLATE = app
 QT -= gui
 
 CONFIG += c++11 console
