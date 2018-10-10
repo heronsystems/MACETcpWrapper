@@ -170,7 +170,7 @@ bool TcpLink::_hardwareConnect(QAbstractSocket::SocketError &error, QString& err
         tcpClient = NULL;
     }
 
-    std::cout << "UdpLink: hardwareConnect to " << _config.getServerAddress() << ":" << _config.getServerPortNumber() << std::endl;
+    std::cout << "TcpLink: hardwareConnect to " << _config.getServerAddress() << ":" << _config.getServerPortNumber() << std::endl;
 
     tcpClient = new QTcpSocket();
     tcpClient->bind(QHostAddress(QString::fromStdString((_config.getServerAddress()))), _config.getServerPortNumber(), QTcpSocket::ShareAddress);
